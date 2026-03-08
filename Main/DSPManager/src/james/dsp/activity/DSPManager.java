@@ -21,14 +21,14 @@ import android.content.res.Resources;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import android.support.v13.app.FragmentPagerAdapter;
-import android.support.v7.app.ActionBarDrawerToggle;
+import androidx.legacy.app.FragmentPagerAdapter;
+import androidx.legacy.app.ActionBarDrawerToggle;
 import android.util.Log;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
-import android.support.v4.content.res.ResourcesCompat;
-import android.support.v4.view.GravityCompat;
-import android.support.v4.view.ViewPager;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.core.content.res.ResourcesCompat;
+import androidx.core.view.GravityCompat;
+import androidx.viewpager.widget.ViewPager;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -59,6 +59,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import android.widget.Toast;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.OnApplyWindowInsetsListener;
+import androidx.core.view.ViewCompat;
+import androidx.core.graphics.Insets;
 
 /**
 * This page is displays the activity_main-level configurations menu.
@@ -184,19 +189,41 @@ public final class DSPManager extends Activity
      	 else
      	     return true;
 	}
+
+    private void registerUpdateReceiver()
+    {
+        IntentFilter filter = new IntentFilter("dsp.activity.updatePage");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+            registerReceiver(updateReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        else
+            registerReceiver(updateReceiver, filter);
+    }
+
+    private void requestRuntimePermissionsForCurrentApi()
+    {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+            checkPermission(this, Manifest.permission.READ_MEDIA_AUDIO, "Permission check", "Audio media permission is needed for impulse response reading");
+        else
+            checkPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE, "Permission check", "External storage permission is needed for impulse response reading");
+
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q)
+            checkPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE, "Permission check", "Writing external storage is the way to save HQ resampled audio file if necessary");
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+            checkPermission(this, Manifest.permission.BLUETOOTH_CONNECT, "Permission check", "We need bluetooth permission to read connected device status");
+        else
+        {
+            checkPermission(this, Manifest.permission.BLUETOOTH, "Permission check", "We need to get information for bluetooth");
+            checkPermission(this, Manifest.permission.BLUETOOTH_ADMIN, "Permission check", "We need to get information for bluetooth");
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState)
     {
         super.onCreate(savedInstanceState);
         actUi = getApplicationContext();
-        checkPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE, "Permission check", "External storage permission is needed for impulse response reading");
-        checkPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE, "Permission check", "Writing external storage is the way to save HQ resampled audio file if necessary");
-        checkPermission(this, Manifest.permission.MODIFY_AUDIO_SETTINGS, "Permission check", "Modify global audio setting is necessary");
-        checkPermission(this, Manifest.permission.RECEIVE_BOOT_COMPLETED, "Permission check", "If have to reopen JamesDSP app everytime you reboot if you refuse");
-        checkPermission(this, Manifest.permission.BLUETOOTH, "Permission check", "We need to get information for bluetooth");
-        checkPermission(this, Manifest.permission.BLUETOOTH_ADMIN, "Permission check", "We need to get information for bluetooth");
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
-	        checkPermission(this, Manifest.permission.FOREGROUND_SERVICE, "Permission check", "We need background service to keep global registraton mode running");
+        requestRuntimePermissionsForCurrentApi();
         preferencesMode = getSharedPreferences(DSPManager.SHARED_PREFERENCES_BASENAME + "." + "settings", 0);
         SharedPreferences preferences = getSharedPreferences(DSPManager.SHARED_PREFERENCES_BASENAME + "." + HeadsetService.getAudioOutputRouting(), 0);
         File impFile = new File(preferences.getString("dsp.convolver.files", ""));
@@ -226,7 +253,7 @@ public final class DSPManager extends Activity
         startService(serviceIntent);
         sendBroadcast(new Intent(DSPManager.ACTION_UPDATE_PREFERENCES));
         setUpUi();
-		registerReceiver(updateReceiver, new IntentFilter("dsp.activity.updatePage"));
+		registerUpdateReceiver();
         if (HeadsetService.mUseBluetooth)
             routing = 2;
         else if (HeadsetService.mUseHeadset)
@@ -239,7 +266,7 @@ public final class DSPManager extends Activity
     protected void onResume()
     {
         super.onResume();
-		registerReceiver(updateReceiver, new IntentFilter("dsp.activity.updatePage"));
+		registerUpdateReceiver();
     }
     @Override
     protected void onPause()
@@ -356,6 +383,25 @@ public final class DSPManager extends Activity
     // Methods
     //==================================
 
+    private void enableEdgeToEdgeUi()
+    {
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        final View drawerLayout = findViewById(R.id.dsp_drawer_layout);
+        ViewCompat.setOnApplyWindowInsetsListener(drawerLayout, new OnApplyWindowInsetsListener()
+        {
+            @Override
+            public WindowInsetsCompat onApplyWindowInsets(View v, WindowInsetsCompat insets)
+            {
+                Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+                v.setPadding(0, bars.top, 0, 0);
+                if (mDrawerListView != null)
+                    mDrawerListView.setPadding(0, bars.top, 0, bars.bottom);
+                return insets;
+            }
+        });
+        ViewCompat.requestApplyInsets(drawerLayout);
+    }
+
     @SuppressLint("NewApi")
     private void setUpUi()
     {
@@ -363,6 +409,7 @@ public final class DSPManager extends Activity
         mEntries = getEntries();
         setContentView(R.layout.activity_main);
         mDrawerListView = (ListView)findViewById(R.id.dsp_navigation_drawer);
+        enableEdgeToEdgeUi();
         mDrawerListView.setOnItemClickListener(new AdapterView.OnItemClickListener()
         {
             @Override
