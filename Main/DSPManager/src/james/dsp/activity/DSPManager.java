@@ -21,14 +21,14 @@ import android.content.res.Resources;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import android.support.v13.app.FragmentPagerAdapter;
-import android.support.v7.app.ActionBarDrawerToggle;
+import androidx.legacy.app.FragmentPagerAdapter;
+import androidx.legacy.app.ActionBarDrawerToggle;
 import android.util.Log;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
-import android.support.v4.content.res.ResourcesCompat;
-import android.support.v4.view.GravityCompat;
-import android.support.v4.view.ViewPager;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.core.content.res.ResourcesCompat;
+import androidx.core.view.GravityCompat;
+import androidx.viewpager.widget.ViewPager;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -59,6 +59,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import android.widget.Toast;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.OnApplyWindowInsetsListener;
+import androidx.core.view.ViewCompat;
+import androidx.core.graphics.Insets;
 
 /**
 * This page is displays the activity_main-level configurations menu.
@@ -378,6 +383,25 @@ public final class DSPManager extends Activity
     // Methods
     //==================================
 
+    private void enableEdgeToEdgeUi()
+    {
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        final View drawerLayout = findViewById(R.id.dsp_drawer_layout);
+        ViewCompat.setOnApplyWindowInsetsListener(drawerLayout, new OnApplyWindowInsetsListener()
+        {
+            @Override
+            public WindowInsetsCompat onApplyWindowInsets(View v, WindowInsetsCompat insets)
+            {
+                Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+                v.setPadding(0, bars.top, 0, 0);
+                if (mDrawerListView != null)
+                    mDrawerListView.setPadding(0, bars.top, 0, bars.bottom);
+                return insets;
+            }
+        });
+        ViewCompat.requestApplyInsets(drawerLayout);
+    }
+
     @SuppressLint("NewApi")
     private void setUpUi()
     {
@@ -385,6 +409,7 @@ public final class DSPManager extends Activity
         mEntries = getEntries();
         setContentView(R.layout.activity_main);
         mDrawerListView = (ListView)findViewById(R.id.dsp_navigation_drawer);
+        enableEdgeToEdgeUi();
         mDrawerListView.setOnItemClickListener(new AdapterView.OnItemClickListener()
         {
             @Override
