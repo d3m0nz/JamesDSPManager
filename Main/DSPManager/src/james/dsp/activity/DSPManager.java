@@ -184,19 +184,41 @@ public final class DSPManager extends Activity
      	 else
      	     return true;
 	}
+
+    private void registerUpdateReceiver()
+    {
+        IntentFilter filter = new IntentFilter("dsp.activity.updatePage");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+            registerReceiver(updateReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        else
+            registerReceiver(updateReceiver, filter);
+    }
+
+    private void requestRuntimePermissionsForCurrentApi()
+    {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+            checkPermission(this, Manifest.permission.READ_MEDIA_AUDIO, "Permission check", "Audio media permission is needed for impulse response reading");
+        else
+            checkPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE, "Permission check", "External storage permission is needed for impulse response reading");
+
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q)
+            checkPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE, "Permission check", "Writing external storage is the way to save HQ resampled audio file if necessary");
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+            checkPermission(this, Manifest.permission.BLUETOOTH_CONNECT, "Permission check", "We need bluetooth permission to read connected device status");
+        else
+        {
+            checkPermission(this, Manifest.permission.BLUETOOTH, "Permission check", "We need to get information for bluetooth");
+            checkPermission(this, Manifest.permission.BLUETOOTH_ADMIN, "Permission check", "We need to get information for bluetooth");
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState)
     {
         super.onCreate(savedInstanceState);
         actUi = getApplicationContext();
-        checkPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE, "Permission check", "External storage permission is needed for impulse response reading");
-        checkPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE, "Permission check", "Writing external storage is the way to save HQ resampled audio file if necessary");
-        checkPermission(this, Manifest.permission.MODIFY_AUDIO_SETTINGS, "Permission check", "Modify global audio setting is necessary");
-        checkPermission(this, Manifest.permission.RECEIVE_BOOT_COMPLETED, "Permission check", "If have to reopen JamesDSP app everytime you reboot if you refuse");
-        checkPermission(this, Manifest.permission.BLUETOOTH, "Permission check", "We need to get information for bluetooth");
-        checkPermission(this, Manifest.permission.BLUETOOTH_ADMIN, "Permission check", "We need to get information for bluetooth");
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
-	        checkPermission(this, Manifest.permission.FOREGROUND_SERVICE, "Permission check", "We need background service to keep global registraton mode running");
+        requestRuntimePermissionsForCurrentApi();
         preferencesMode = getSharedPreferences(DSPManager.SHARED_PREFERENCES_BASENAME + "." + "settings", 0);
         SharedPreferences preferences = getSharedPreferences(DSPManager.SHARED_PREFERENCES_BASENAME + "." + HeadsetService.getAudioOutputRouting(), 0);
         File impFile = new File(preferences.getString("dsp.convolver.files", ""));
@@ -226,7 +248,7 @@ public final class DSPManager extends Activity
         startService(serviceIntent);
         sendBroadcast(new Intent(DSPManager.ACTION_UPDATE_PREFERENCES));
         setUpUi();
-		registerReceiver(updateReceiver, new IntentFilter("dsp.activity.updatePage"));
+		registerUpdateReceiver();
         if (HeadsetService.mUseBluetooth)
             routing = 2;
         else if (HeadsetService.mUseHeadset)
@@ -239,7 +261,7 @@ public final class DSPManager extends Activity
     protected void onResume()
     {
         super.onResume();
-		registerReceiver(updateReceiver, new IntentFilter("dsp.activity.updatePage"));
+		registerUpdateReceiver();
     }
     @Override
     protected void onPause()
